@@ -19,7 +19,7 @@ export default function LoginForm() {
   // Route guard: if token exists, redirect to chat
   useEffect(() => {
     if (token) {
-      router.replace('/');
+      router.replace("/chat");
     }
   }, [token, router]);
 
@@ -39,7 +39,7 @@ export default function LoginForm() {
       const response = await api.login(phone.trim(), name.trim());
       // On success, store the JWT token and user object
       login(response.user, response.token);
-      router.push('/');
+      router.push("/chat");
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message || 'Login failed. Please try again.');
