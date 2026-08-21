@@ -19,6 +19,7 @@ export default function ChatPage() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [errorMessages, setErrorMessages] = useState<string | null>(null);
   
   // PRIORITY 3: Queue for offline messages
   // Decided to keep in memory (state) for now. If app is closed, queue is dropped. 
@@ -49,31 +50,28 @@ export default function ChatPage() {
     };
   }, [token, router]);
 
+  const fetchMsgs = useCallback(async () => {
+    if (!token || !selectedConversationId) return;
+    setLoadingMessages(true);
+    setErrorMessages(null);
+    try {
+      const data = await api.getMessages(token, selectedConversationId);
+      // Priority 4: assume fetched messages are already 'seen' or 'delivered' by definition of being in DB
+      setMessages(data.map(m => ({ ...m, status: 'seen' })));
+      // Wait for render then scroll
+      setTimeout(() => scrollToBottom('auto'), 100);
+    } catch (err: any) {
+      console.error('Failed to load messages', err);
+      setErrorMessages(err.message || 'Failed to load messages');
+    } finally {
+      setLoadingMessages(false);
+    }
+  }, [token, selectedConversationId]);
+
   // Fetch messages when conversation changes
   useEffect(() => {
-    if (!token || !selectedConversationId) return;
-
-    let isMounted = true;
-    const fetchMsgs = async () => {
-      setLoadingMessages(true);
-      try {
-        const data = await api.getMessages(token, selectedConversationId);
-        if (isMounted) {
-          // Priority 4: assume fetched messages are already 'seen' or 'delivered' by definition of being in DB
-          setMessages(data.map(m => ({ ...m, status: 'seen' })));
-          // Wait for render then scroll
-          setTimeout(() => scrollToBottom('auto'), 100);
-        }
-      } catch (err) {
-        console.error('Failed to load messages', err);
-      } finally {
-        if (isMounted) setLoadingMessages(false);
-      }
-    };
     fetchMsgs();
-
-    return () => { isMounted = false; };
-  }, [token, selectedConversationId]);
+  }, [fetchMsgs]);
 
   // Handle incoming real-time messages & seen receipts
   useEffect(() => {
@@ -158,9 +156,21 @@ export default function ChatPage() {
                 <div className="flex justify-center items-center h-full">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
+              ) : errorMessages ? (
+                <div className="flex flex-col justify-center items-center h-full text-center">
+                  <p className="text-red-500 dark:text-red-400 mb-4 bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm">{errorMessages}</p>
+                  <button
+                    onClick={fetchMsgs}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors shadow-sm"
+                  >
+                    Retry Loading Messages
+                  </button>
+                </div>
               ) : allMessages.length === 0 ? (
                 <div className="flex justify-center items-center h-full text-gray-500 dark:text-gray-400">
-                  No messages yet. Send a message to start the conversation!
+                  <div className="bg-white/80 dark:bg-gray-800/80 px-4 py-2 rounded-lg text-sm shadow-sm backdrop-blur-sm">
+                    No messages yet. Send a message to start the conversation!
+                  </div>
                 </div>
               ) : (
                 <div className="flex flex-col">
