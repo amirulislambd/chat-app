@@ -9,6 +9,7 @@ import MessageInput from '@/src/components/MessageInput';
 import TypingIndicator from '@/src/components/TypingIndicator';
 import OfflineBanner from '@/src/components/OfflineBanner';
 import NewChatModal from '@/src/components/NewChatModal';
+import GroupMembersModal from "@/src/components/GroupMembersModal";
 import { api } from '@/src/lib/api';
 import { socket, connectSocket, disconnectSocket } from '@/src/lib/socket';
 import { Message, Conversation, SeenPayload, User } from "@/src/types";
@@ -44,6 +45,7 @@ export default function ChatPage() {
   const [selectedConversation, setSelectedConversation] =
     useState<Conversation | null>(null);
   const [showAddMembers, setShowAddMembers] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
   const [replyTo, setReplyTo] = useState<Message['replyTo']>();
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [errorMessages, setErrorMessages] = useState<string | null>(null);
@@ -204,6 +206,19 @@ export default function ChatPage() {
 
   // Combine real and pending messages for display
   const allMessages = [...messages, ...pendingMessages.filter(p => p.conversation === selectedConversationId)];
+  const groupMembers =
+    selectedConversation?.type === "group"
+      ? [
+          ...(selectedConversation.participants || []),
+          ...(selectedConversation.participants?.some((participant) =>
+            typeof participant === "string"
+              ? participant === user._id
+              : participant._id === user._id,
+          )
+            ? []
+            : [user]),
+        ]
+      : [];
 
   return (
     <div className="h-screen w-full overflow-hidden bg-gray-50 dark:bg-gray-900">
@@ -244,9 +259,33 @@ export default function ChatPage() {
                   </svg>
                 </button>
                 <h3 className="font-medium text-gray-900 dark:text-gray-100">
-                  Chat
+                  {selectedConversation?.type === "group"
+                    ? selectedConversation.name || "Unnamed Group"
+                    : "Chat"}
                 </h3>
-                {selectedConversation?.type === 'group' && (
+                {selectedConversation?.type === "group" && (
+                  <button
+                    type="button"
+                    onClick={() => setShowMembers(true)}
+                    className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+                    aria-label={`View ${groupMembers.length} group members`}
+                    title="View group members"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path d="M16 11a4 4 0 1 0-3.9-5h-.2A4 4 0 0 0 8 11a4 4 0 0 0 4 4 4 4 0 0 0 4-4Zm-8 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4Zm8 2c-.7 0-1.37.1-2 .3a5.98 5.98 0 0 1-2.2 2.1c.7-.25 1.44-.4 2.2-.4 2.67 0 5 1.34 5 3v1h2v-1c0-2.66-2.67-5-5-5Zm-8 2c-2.67 0-8 1.34-8 4v1h16v-1c0-2.66-5.33-4-8-4Z" />
+                    </svg>
+                    <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-green-500 px-1 text-[9px] font-bold leading-none text-white">
+                      {groupMembers.length}
+                    </span>
+                  </button>
+                )}
+                {selectedConversation?.type === "group" && (
                   <button
                     type="button"
                     onClick={() => setShowAddMembers(true)}
@@ -254,7 +293,12 @@ export default function ChatPage() {
                     aria-label="Add members"
                     title="Add members"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
                       <path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6Zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4Z" />
                     </svg>
                   </button>
@@ -308,7 +352,9 @@ export default function ChatPage() {
                           message={msg}
                           isOwn={msg.sender === user._id}
                           sender={sender}
-                          onReply={(message, senderName) => setReplyTo({ senderName, text: message.text })}
+                          onReply={(message, senderName) =>
+                            setReplyTo({ senderName, text: message.text })
+                          }
                         />
                       );
                     })}
@@ -378,19 +424,43 @@ export default function ChatPage() {
         <NewChatModal
           mode="add-members"
           conversationId={selectedConversation._id}
-          existingParticipantIds={Array.isArray(selectedConversation.participants)
-            ? selectedConversation.participants.map(participant => typeof participant === 'string' ? participant : participant._id)
-            : []}
+          existingParticipantIds={
+            Array.isArray(selectedConversation.participants)
+              ? selectedConversation.participants.map((participant) =>
+                  typeof participant === "string"
+                    ? participant
+                    : participant._id,
+                )
+              : []
+          }
           onClose={() => setShowAddMembers(false)}
           onChatCreated={() => undefined}
           onMembersAdded={(users) => {
-            setSelectedConversation(current => current ? {
-              ...current,
-              participants: Array.isArray(current.participants) && current.participants.every(participant => typeof participant !== 'string')
-                ? [...current.participants, ...users]
-                : [...(current.participants || []), ...users.map(user => user._id)],
-            } : current);
+            setSelectedConversation((current) =>
+              current
+                ? {
+                    ...current,
+                    participants:
+                      Array.isArray(current.participants) &&
+                      current.participants.every(
+                        (participant) => typeof participant !== "string",
+                      )
+                        ? [...current.participants, ...users]
+                        : [
+                            ...(current.participants || []),
+                            ...users.map((user) => user._id),
+                          ],
+                  }
+                : current,
+            );
           }}
+        />
+      )}
+      {showMembers && selectedConversation?.type === "group" && (
+        <GroupMembersModal
+          groupName={selectedConversation.name || "Unnamed Group"}
+          members={groupMembers}
+          onClose={() => setShowMembers(false)}
         />
       )}
     </div>

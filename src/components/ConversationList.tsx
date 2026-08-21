@@ -298,6 +298,17 @@ export default function ConversationList({
               const unread = unreadCounts[conv._id] || 0;
               const isSelected = selectedConversationId === conv._id;
               const name = getConversationName(conv);
+              const memberCount =
+                conv.type === "group"
+                  ? new Set([
+                      ...(conv.participants || []).map((participant) =>
+                        typeof participant === "string"
+                          ? participant
+                          : participant._id,
+                      ),
+                      ...(currentUser?._id ? [currentUser._id] : []),
+                    ]).size
+                  : 0;
               return (
                 <li
                   key={conv._id}
@@ -312,11 +323,30 @@ export default function ConversationList({
                 >
                   {/* Avatar */}
                   <div className="relative flex-shrink-0">
-                    <div className="w-11 h-11 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-base shadow-sm">
-                      {name.charAt(0).toUpperCase()}
-                    </div>
+                    {conv.type === "group" ? (
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600 shadow-sm dark:bg-blue-900/30 dark:text-blue-300">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-6 w-6"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                          aria-hidden="true"
+                        >
+                          <path d="M16 11a4 4 0 1 0-3.9-5h-.2A4 4 0 0 0 8 11a4 4 0 0 0 4 4 4 4 0 0 0 4-4Zm-8 0a2 2 0 1 1 0-4 2 2 0 0 1 0 4Zm8 2c-.7 0-1.37.1-2 .3a5.98 5.98 0 0 1-2.2 2.1c.7-.25 1.44-.4 2.2-.4 2.67 0 5 1.34 5 3v1h2v-1c0-2.66-2.67-5-5-5Zm-8 2c-2.67 0-8 1.34-8 4v1h16v-1c0-2.66-5.33-4-8-4Z" />
+                        </svg>
+                      </div>
+                    ) : (
+                      <div className="w-11 h-11 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-base shadow-sm">
+                        {name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    {conv.type === "group" && (
+                      <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-green-500 px-1 text-[9px] font-bold leading-none text-white">
+                        {memberCount}
+                      </span>
+                    )}
                     {unread > 0 && (
-                      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-green-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow-md">
+                      <span className={`absolute ${conv.type === "group" ? "-bottom-1 -right-1" : "-top-1 -right-1"} min-w-[18px] h-[18px] bg-green-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow-md`}>
                         {unread > 99 ? "99+" : unread}
                       </span>
                     )}
