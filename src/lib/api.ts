@@ -1,6 +1,6 @@
 import { User, Conversation, Message, ApiError } from '../types';
 
-const API_BASE = 'https://frontend-task-chatapp.onrender.com/api';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://frontend-task-chatapp.onrender.com/api';
 
 async function fetchWithAuth(url: string, options: RequestInit = {}, token?: string) {
   const headers = new Headers(options.headers);
