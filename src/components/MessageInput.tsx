@@ -93,7 +93,7 @@ export default function MessageInput({
 
       for (const pm of toFlush) {
         try {
-          const sent = await api.sendMessage(token, pm.conversationId, pm.text);
+          const sent = await api.sendMessage(token, pm.conversation, pm.text);
           onMessageSent({ ...sent, status: 'sent' });
         } catch {
           // Re-queue on failure
@@ -118,10 +118,10 @@ export default function MessageInput({
     // PRIORITY 3: If offline or socket disconnected, queue the message
     if (!navigator.onLine || !socket.connected) {
       const pending: Message = {
-        id: '',
+        _id: '',
         localId: `local_${Date.now()}`,
-        conversationId,
-        senderId: currentUserId,
+        conversation: conversationId,
+        sender: currentUserId,
         text: trimmed,
         createdAt: new Date().toISOString(),
         status: 'pending',
@@ -138,10 +138,10 @@ export default function MessageInput({
     } catch (err) {
       // On failure, queue it
       const pending: Message = {
-        id: '',
+        _id: '',
         localId: `local_${Date.now()}`,
-        conversationId,
-        senderId: currentUserId,
+        conversation: conversationId,
+        sender: currentUserId,
         text: trimmed,
         createdAt: new Date().toISOString(),
         status: 'pending',

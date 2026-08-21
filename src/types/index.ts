@@ -6,14 +6,15 @@ export interface User {
 }
 
 export interface Conversation {
-  id: string;
+  _id: string;
   type: 'direct' | 'group';
-  participants: User[];
+  participants?: string[] | User[]; // Group chats might return array of IDs or Users
+  participant?: User; // Direct chats return the other user here
   name?: string;
   admins?: string[];
   lastMessage?: {
-    text: string;
-    createdAt: string;
+    text?: string;
+    createdAt?: string;
   };
   updatedAt: string;
 }
@@ -22,9 +23,9 @@ export interface Conversation {
 export type MessageStatus = 'pending' | 'sent' | 'delivered' | 'seen';
 
 export interface Message {
-  id: string;
-  conversationId: string;
-  senderId: string;
+  _id: string;
+  conversation: string; // the API uses 'conversation' instead of 'conversationId'
+  sender: string; // the API uses 'sender' instead of 'senderId'
   text: string;
   createdAt: string;
   // Bonus features

@@ -82,12 +82,11 @@ export const api = {
 
   async getConversations(token: string): Promise<Conversation[]> {
     const data = await fetchWithAuth('/conversations', {}, token);
-    if (!Array.isArray(data)) {
-      console.warn('[Shape Mismatch] getConversations: Expected array. Received:', data);
-    } else if (data.length > 0) {
-      checkShape(data[0], ['id', 'type', 'participants', 'updatedAt'], 'getConversations[0]');
+    const conversations = Array.isArray(data) ? data : data?.data || [];
+    if (conversations.length > 0) {
+      checkShape(conversations[0], ['_id', 'type', 'updatedAt'], 'getConversations[0]');
     }
-    return data;
+    return conversations;
   },
 
   async startConversation(token: string, userId: string): Promise<Conversation> {
@@ -95,7 +94,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ userId })
     }, token);
-    checkShape(data, ['id', 'type', 'participants', 'updatedAt'], 'startConversation');
+    checkShape(data, ['_id', 'type'], 'startConversation');
     return data;
   },
 
@@ -139,12 +138,11 @@ export const api = {
 
   async getMessages(token: string, conversationId: string): Promise<Message[]> {
     const data = await fetchWithAuth(`/conversations/${conversationId}/messages`, {}, token);
-    if (!Array.isArray(data)) {
-      console.warn('[Shape Mismatch] getMessages: Expected array. Received:', data);
-    } else if (data.length > 0) {
-      checkShape(data[0], ['id', 'conversationId', 'senderId', 'text', 'createdAt'], 'getMessages[0]');
+    const messages = Array.isArray(data) ? data : data?.messages || [];
+    if (messages.length > 0) {
+      checkShape(messages[0], ['_id', 'conversation', 'sender', 'text', 'createdAt'], 'getMessages[0]');
     }
-    return data;
+    return messages;
   },
 
   async sendMessage(token: string, conversationId: string, text: string): Promise<Message> {
@@ -152,7 +150,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ conversationId, text })
     }, token);
-    checkShape(data, ['id', 'conversationId', 'senderId', 'text', 'createdAt'], 'sendMessage');
+    checkShape(data, ['_id', 'conversation', 'sender', 'text', 'createdAt'], 'sendMessage');
     return data;
   }
 };

@@ -78,10 +78,10 @@ export default function ChatPage() {
     if (!selectedConversationId || !user) return;
 
     const handleNewMessage = (msg: Message) => {
-      if (msg.conversationId === selectedConversationId) {
+      if (msg.conversation === selectedConversationId) {
         setMessages(prev => {
           // Prevent duplicates
-          if (prev.some(m => m.id === msg.id)) return prev;
+          if (prev.some(m => m._id === msg._id)) return prev;
           return [...prev, { ...msg, status: 'delivered' }];
         });
 
@@ -89,7 +89,7 @@ export default function ChatPage() {
         const container = scrollContainerRef.current;
         if (container) {
           const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
-          if (isNearBottom || msg.senderId === user._id) {
+          if (isNearBottom || msg.sender === user._id) {
             setTimeout(() => scrollToBottom('smooth'), 50);
           }
         }
@@ -97,7 +97,7 @@ export default function ChatPage() {
         // PRIORITY 4: Emit seen immediately if we are viewing this chat
         socket.emit('message:seen', {
           conversationId: selectedConversationId,
-          lastSeenMessageId: msg.id,
+          lastSeenMessageId: msg._id,
           userId: user._id
         } as SeenPayload);
       }
@@ -107,7 +107,7 @@ export default function ChatPage() {
       if (payload.conversationId === selectedConversationId && payload.userId !== user._id) {
         // Mark all my messages in this convo up to lastSeenMessageId as seen
         setMessages(prev => prev.map(m => 
-          m.senderId === user._id ? { ...m, status: 'seen' } : m
+          m.sender === user._id ? { ...m, status: 'seen' } : m
         ));
       }
     };
@@ -126,7 +126,7 @@ export default function ChatPage() {
   }
 
   // Combine real and pending messages for display
-  const allMessages = [...messages, ...pendingMessages.filter(p => p.conversationId === selectedConversationId)];
+  const allMessages = [...messages, ...pendingMessages.filter(p => p.conversation === selectedConversationId)];
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
@@ -176,9 +176,9 @@ export default function ChatPage() {
                 <div className="flex flex-col">
                   {allMessages.map(msg => (
                     <MessageBubble 
-                      key={msg.id || msg.localId} 
+                      key={msg._id || msg.localId} 
                       message={msg} 
-                      isOwn={msg.senderId === user._id} 
+                      isOwn={msg.sender === user._id} 
                     />
                   ))}
                   <div ref={messagesEndRef} className="h-1" />

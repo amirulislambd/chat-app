@@ -28,12 +28,8 @@ export default function ConversationList({ selectedConversationId, onSelectConve
     setLoading(true);
     setError(null);
     try {
-      const responseData = await api.getConversations(token);
-      // Ensure data is an array in case the API returns an object (e.g., { data: [...] } or { conversations: [...] })
-      const data = Array.isArray(responseData) 
-        ? responseData 
-        : (responseData as any).data || (responseData as any).conversations || [];
-        
+      const data = await api.getConversations(token);
+      
       if (!Array.isArray(data)) {
         throw new Error('Invalid response format from server');
       }
@@ -56,22 +52,22 @@ export default function ConversationList({ selectedConversationId, onSelectConve
     if (conv.type === 'group') {
       return conv.name || 'Unnamed Group';
     }
-    // For direct chats, find the other participant
-    // Guard: participants may be undefined if the API omits it
-    const participants = Array.isArray(conv.participants) ? conv.participants : [];
-    const otherParticipant = participants.find(p => p._id !== currentUser?._id);
-    return otherParticipant?.name || 'Unknown User';
+    // For direct chats, the other participant is returned as conv.participant
+    if (conv.participant) {
+      return conv.participant.name || 'Unknown User';
+    }
+    return 'Unknown User';
   };
 
   const handleChatCreated = (conv: Conversation) => {
     setIsNewChatModalOpen(false);
     // Add to top of list if not already there
     setConversations(prev => {
-      const exists = prev.find(c => c.id === conv.id);
+      const exists = prev.find(c => c._id === conv._id);
       if (exists) return prev;
       return [conv, ...prev];
     });
-    onSelectConversation(conv.id);
+    onSelectConversation(conv._id);
   };
 
   return (
@@ -138,14 +134,12 @@ export default function ConversationList({ selectedConversationId, onSelectConve
           // List state
           <ul className="divide-y divide-gray-100 dark:divide-gray-700">
             {conversations.map(conv => (
-              <li
-                key={conv.id}
-                onClick={() => onSelectConversation(conv.id)}
-                className={`p-3 cursor-pointer transition-colors flex items-center ${
-                  selectedConversationId === conv.id
-                    ? 'bg-blue-50 dark:bg-blue-900/30'
-                    : 'hover:bg-gray-50 dark:hover:bg-gray-700'
-                }`}
+              <li 
+                key={conv._id}
+                onClick={() => onSelectConversation(conv._id)}
+                className={`flex items-center p-3 cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700
+                  ${selectedConversationId === conv._id ? 'bg-blue-50 dark:bg-blue-900/30 border-l-4 border-l-blue-600 dark:border-l-blue-400' : 'border-l-4 border-l-transparent'}
+                `}
               >
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 text-lg">
                   {getConversationName(conv).charAt(0).toUpperCase()}

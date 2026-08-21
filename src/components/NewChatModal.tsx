@@ -89,8 +89,7 @@ export default function NewChatModal({ onClose, onChatCreated, existingConversat
     const existing = existingConversations.find(
       c =>
         c.type === 'direct' &&
-        Array.isArray(c.participants) &&
-        c.participants.some(p => p._id === userId)
+        c.participant?._id === userId
     );
     if (existing) {
       onChatCreated(existing); // jump straight to the existing conversation
