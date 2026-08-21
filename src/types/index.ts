@@ -7,7 +7,7 @@ export interface User {
 
 export interface Conversation {
   _id: string;
-  type: 'direct' | 'group';
+  type: "direct" | "group";
   participants?: string[] | User[]; // Group chats might return array of IDs or Users
   participant?: User; // Direct chats return the other user here
   name?: string;
@@ -16,6 +16,7 @@ export interface Conversation {
     text?: string;
     createdAt?: string;
   };
+  unreadCount?: number;
   updatedAt: string;
 }
 

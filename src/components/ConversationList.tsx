@@ -62,6 +62,16 @@ export default function ConversationList({
           new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
       );
       setConversations(sorted);
+      setUnreadCounts(
+        Object.fromEntries(
+          sorted
+            .filter((conversation) => (conversation.unreadCount || 0) > 0)
+            .map((conversation) => [
+              conversation._id,
+              conversation.unreadCount ?? 0,
+            ]),
+        ),
+      );
     } catch (err: any) {
       if (err?.status === 401 || err?.status === 403) {
         logout();
@@ -298,17 +308,6 @@ export default function ConversationList({
               const unread = unreadCounts[conv._id] || 0;
               const isSelected = selectedConversationId === conv._id;
               const name = getConversationName(conv);
-              const memberCount =
-                conv.type === "group"
-                  ? new Set([
-                      ...(conv.participants || []).map((participant) =>
-                        typeof participant === "string"
-                          ? participant
-                          : participant._id,
-                      ),
-                      ...(currentUser?._id ? [currentUser._id] : []),
-                    ]).size
-                  : 0;
               return (
                 <li
                   key={conv._id}
@@ -340,13 +339,8 @@ export default function ConversationList({
                         {name.charAt(0).toUpperCase()}
                       </div>
                     )}
-                    {conv.type === "group" && (
-                      <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-green-500 px-1 text-[9px] font-bold leading-none text-white">
-                        {memberCount}
-                      </span>
-                    )}
                     {unread > 0 && (
-                      <span className={`absolute ${conv.type === "group" ? "-bottom-1 -right-1" : "-top-1 -right-1"} min-w-[18px] h-[18px] bg-green-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow-md`}>
+                      <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-green-500 px-1 text-[10px] font-bold text-white shadow-md">
                         {unread > 99 ? "99+" : unread}
                       </span>
                     )}
