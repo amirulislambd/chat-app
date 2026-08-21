@@ -15,7 +15,23 @@ import { Message, Conversation, SeenPayload } from '@/src/types';
 export default function ChatPage() {
   const { token, user } = useAuth();
   const router = useRouter();
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+
+  // Persist selected conversation across reloads
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('selectedConversationId') || null;
+    }
+    return null;
+  });
+
+  const handleSelectConversation = (id: string | null) => {
+    setSelectedConversationId(id);
+    if (id) {
+      localStorage.setItem('selectedConversationId', id);
+    } else {
+      localStorage.removeItem('selectedConversationId');
+    }
+  };
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -88,7 +104,6 @@ export default function ChatPage() {
           return [...prev, { ...msg, status: 'delivered' }];
         });
 
-        // Auto-scroll logic: only scroll if already near bottom, else show "new message" pill (implement pill later)
         const container = scrollContainerRef.current;
         if (container) {
           const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
@@ -97,12 +112,32 @@ export default function ChatPage() {
           }
         }
 
-        // PRIORITY 4: Emit seen immediately if we are viewing this chat
         socket.emit('message:seen', {
           conversationId: selectedConversationId,
           lastSeenMessageId: msg._id,
           userId: user._id
         } as SeenPayload);
+      }
+
+      // Play a notification ping for messages NOT sent by me
+      if (msg.sender !== user._id) {
+        try {
+          const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+          const ctx = new AudioCtx();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(880, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.15);
+          gain.gain.setValueAtTime(0.15, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.4);
+        } catch (_) {
+          // Browsers may block AudioContext before user interaction — silent fail
+        }
       }
     };
 
@@ -145,7 +180,7 @@ export default function ChatPage() {
       {/* Sidebar: ConversationList */}
       <ConversationList
         selectedConversationId={selectedConversationId}
-        onSelectConversation={setSelectedConversationId}
+        onSelectConversation={handleSelectConversation}
         className={selectedConversationId ? 'hidden md:flex' : 'flex'}
       />
 
@@ -156,7 +191,7 @@ export default function ChatPage() {
             {/* Header */}
             <div className="h-14 border-b border-gray-200 dark:border-gray-700 flex items-center px-4 bg-white dark:bg-gray-800 shadow-sm z-10 flex-shrink-0 gap-3">
                <button 
-                 onClick={() => setSelectedConversationId(null)}
+                 onClick={() => handleSelectConversation(null)}
                  className="md:hidden p-2 -ml-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                >
                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -230,8 +265,16 @@ export default function ChatPage() {
             />
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800">
-            Select a conversation to start chatting
+          <div className="flex-1 flex flex-col items-center justify-center gap-5 bg-gray-50 dark:bg-gray-900">
+            <div className="w-24 h-24 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center shadow-inner">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </div>
+            <div className="text-center">
+              <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-200 mb-1">ChatApp Web</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xs">Select a conversation from the sidebar to start chatting. Your messages are end-to-end secure.</p>
+            </div>
           </div>
         )}
       </main>
