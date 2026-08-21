@@ -1,6 +1,9 @@
 import { User, Conversation, Message, ApiError } from '../types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://frontend-task-chatapp.onrender.com/api';
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "https://frontend-task-chatapp.onrender.com/api";
 
 async function fetchWithAuth(url: string, options: RequestInit = {}, token?: string) {
   const headers = new Headers(options.headers);
@@ -25,7 +28,11 @@ async function fetchWithAuth(url: string, options: RequestInit = {}, token?: str
     } catch {
       errorData = null;
     }
-    const message = errorData?.message || errorData?.error || `Request failed with status ${response.status}`;
+    const message =
+      errorData?.message ||
+      errorData?.error?.message ||
+      (typeof errorData?.error === "string" ? errorData.error : null) ||
+      `Request failed with status ${response.status}`;
     throw new ApiError(response.status, message, errorData);
   }
 
@@ -75,7 +82,7 @@ export const api = {
     if (!Array.isArray(data)) {
       console.warn('[Shape Mismatch] searchUsers: Expected array. Received:', data);
     } else if (data.length > 0) {
-      checkShape(data[0], ['_id', 'phone', 'name', 'createdAt'], 'searchUsers[0]');
+      checkShape(data[0], ["_id", "phone", "name"], "searchUsers[0]");
     }
     return data;
   },
@@ -104,7 +111,8 @@ export const api = {
       body: JSON.stringify({ name, participantIds })
     }, token);
     checkShape(data, ['id', 'type', 'participants', 'updatedAt', 'name'], 'createGroup');
-    return data;
+    // The group endpoint returns `id`, while the rest of the client uses `_id`.
+    return { ...data, _id: data?._id || data?.id };
   },
 
   async addParticipants(token: string, conversationId: string, userIds: string[]): Promise<void> {

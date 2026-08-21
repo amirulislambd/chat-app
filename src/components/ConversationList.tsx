@@ -63,6 +63,10 @@ export default function ConversationList({
       );
       setConversations(sorted);
     } catch (err: any) {
+      if (err?.status === 401 || err?.status === 403) {
+        logout();
+        return;
+      }
       setError(err.message || "Failed to load conversations");
     } finally {
       setLoading(false);

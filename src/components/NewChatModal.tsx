@@ -14,25 +14,38 @@ interface NewChatModalProps {
   onChatCreated: (conversation: Conversation) => void;
   /** Pass the current conversation list so we can detect duplicates client-side (Priority 1) */
   existingConversations?: Conversation[];
+  mode?: "create" | "add-members";
+  conversationId?: string;
+  existingParticipantIds?: string[];
+  onMembersAdded?: (users: User[]) => void;
 }
 
-export default function NewChatModal({ onClose, onChatCreated, existingConversations = [] }: NewChatModalProps) {
+export default function NewChatModal({
+  onClose,
+  onChatCreated,
+  existingConversations = [],
+  mode = "create",
+  conversationId,
+  existingParticipantIds = [],
+  onMembersAdded,
+}: NewChatModalProps) {
   const { token, user: currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<Tab>('direct');
+  const [activeTab, setActiveTab] = useState<Tab>("direct");
 
   // Search state
-  const [query, setQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [searchResults, setSearchResults] = useState<User[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
   // Group state
-  const [groupName, setGroupName] = useState('');
+  const [groupName, setGroupName] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
 
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const participantIdsKey = existingParticipantIds.join(",");
 
   useEffect(() => {
     setIsMounted(true);
@@ -61,10 +74,19 @@ export default function NewChatModal({ onClose, onChatCreated, existingConversat
         const results = await api.searchUsers(token, debouncedQuery);
         // Exclude current user from results
         if (isMounted) {
-          setSearchResults(results.filter(u => u._id !== currentUser?._id));
+          setSearchResults(
+            results.filter(
+              (u) =>
+                u._id !== currentUser?._id &&
+                !participantIdsKey.split(",").includes(u._id),
+            ),
+          );
         }
       } catch (err: any) {
-        if (isMounted) setError(err.message || 'Search failed');
+        if (isMounted)
+          setError(
+            typeof err?.message === "string" ? err.message : "Search failed",
+          );
       } finally {
         if (isMounted) setIsSearching(false);
       }
@@ -75,7 +97,7 @@ export default function NewChatModal({ onClose, onChatCreated, existingConversat
     return () => {
       isMounted = false;
     };
-  }, [debouncedQuery, token, currentUser?._id]);
+  }, [debouncedQuery, token, currentUser?._id, participantIdsKey]);
 
   const toggleUserSelection = (userId: string) => {
     const newSelection = new Set(selectedUsers);
@@ -93,9 +115,7 @@ export default function NewChatModal({ onClose, onChatCreated, existingConversat
     // PRIORITY 1: Check if a direct conversation with this user already exists locally.
     // If so, navigate straight to it — don't call the API again.
     const existing = existingConversations.find(
-      c =>
-        c.type === 'direct' &&
-        c.participant?._id === userId
+      (c) => c.type === "direct" && c.participant?._id === userId,
     );
     if (existing) {
       onChatCreated(existing); // jump straight to the existing conversation
@@ -108,7 +128,11 @@ export default function NewChatModal({ onClose, onChatCreated, existingConversat
       const conv = await api.startConversation(token, userId);
       onChatCreated(conv);
     } catch (err: any) {
-      setError(err.message || 'Failed to start conversation');
+      setError(
+        typeof err?.message === "string"
+          ? err.message
+          : "Failed to start conversation",
+      );
       setIsCreating(false);
     }
   };
@@ -116,21 +140,43 @@ export default function NewChatModal({ onClose, onChatCreated, existingConversat
   const handleCreateGroup = async () => {
     if (!token) return;
     if (selectedUsers.size === 0) {
-      setError('Select at least one user to add to the group');
+      setError("Select at least one user to add to the group");
       return;
     }
-    if (!groupName.trim()) {
-      setError('Please enter a group name');
+    if (mode === "create" && !groupName.trim()) {
+      setError("Please enter a group name");
       return;
     }
 
     setIsCreating(true);
     setError(null);
     try {
-      const conv = await api.createGroup(token, groupName.trim(), Array.from(selectedUsers));
+      if (mode === "add-members" && conversationId) {
+        await api.addParticipants(
+          token,
+          conversationId,
+          Array.from(selectedUsers),
+        );
+        onMembersAdded?.(
+          searchResults.filter((user) => selectedUsers.has(user._id)),
+        );
+        onClose();
+        return;
+      }
+      const conv = await api.createGroup(
+        token,
+        groupName.trim(),
+        Array.from(selectedUsers),
+      );
       onChatCreated(conv);
     } catch (err: any) {
-      setError(err.message || 'Failed to create group');
+      setError(
+        err?.status === 403
+          ? "Only a group admin can add members."
+          : typeof err?.message === "string"
+            ? err.message
+            : "Failed to create group",
+      );
       setIsCreating(false);
     }
   };
@@ -142,7 +188,7 @@ export default function NewChatModal({ onClose, onChatCreated, existingConversat
       <div className=" bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full md:max-w-lg overflow-hidden flex flex-col max-h-[80vh]">
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            New Chat
+            {mode === "add-members" ? "Add Members" : "New Chat"}
           </h2>
           <button
             onClick={onClose}
@@ -152,20 +198,22 @@ export default function NewChatModal({ onClose, onChatCreated, existingConversat
           </button>
         </div>
 
-        <div className="flex border-b border-gray-200 dark:border-gray-700">
-          <button
-            className={`flex-1 py-3 text-sm font-medium ${activeTab === "direct" ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"}`}
-            onClick={() => setActiveTab("direct")}
-          >
-            Direct Message
-          </button>
-          <button
-            className={`flex-1 py-3 text-sm font-medium ${activeTab === "group" ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"}`}
-            onClick={() => setActiveTab("group")}
-          >
-            New Group
-          </button>
-        </div>
+        {mode === "create" && (
+          <div className="flex border-b border-gray-200 dark:border-gray-700">
+            <button
+              className={`flex-1 py-3 text-sm font-medium ${activeTab === "direct" ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"}`}
+              onClick={() => setActiveTab("direct")}
+            >
+              Direct Message
+            </button>
+            <button
+              className={`flex-1 py-3 text-sm font-medium ${activeTab === "group" ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"}`}
+              onClick={() => setActiveTab("group")}
+            >
+              New Group
+            </button>
+          </div>
+        )}
 
         <div className="p-4 flex-shrink-0">
           {error && (
@@ -174,7 +222,7 @@ export default function NewChatModal({ onClose, onChatCreated, existingConversat
             </div>
           )}
 
-          {activeTab === "group" && (
+          {mode === "create" && activeTab === "group" && (
             <div className="mb-4">
               <input
                 type="text"
@@ -188,7 +236,11 @@ export default function NewChatModal({ onClose, onChatCreated, existingConversat
 
           <input
             type="text"
-            placeholder="Search users by name or phone..."
+            placeholder={
+              mode === "add-members"
+                ? "Search users to add..."
+                : "Search users by name or phone..."
+            }
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -211,9 +263,11 @@ export default function NewChatModal({ onClose, onChatCreated, existingConversat
                   key={user._id}
                   className="flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer border border-transparent hover:border-gray-200 dark:hover:border-gray-600"
                   onClick={() =>
-                    activeTab === "direct"
-                      ? handleStartDirectChat(user._id)
-                      : toggleUserSelection(user._id)
+                    mode === "add-members"
+                      ? toggleUserSelection(user._id)
+                      : activeTab === "direct"
+                        ? handleStartDirectChat(user._id)
+                        : toggleUserSelection(user._id)
                   }
                 >
                   <div>
@@ -238,18 +292,24 @@ export default function NewChatModal({ onClose, onChatCreated, existingConversat
           )}
         </div>
 
-        {activeTab === "group" && (
+        {(mode === "add-members" || activeTab === "group") && (
           <div className="p-4 border-t border-gray-200 dark:border-gray-700">
             <button
               onClick={handleCreateGroup}
               disabled={
-                isCreating || selectedUsers.size === 0 || !groupName.trim()
+                isCreating ||
+                selectedUsers.size === 0 ||
+                (mode === "create" && !groupName.trim())
               }
               className="w-full bg-blue-600 text-white py-2 px-4 rounded font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700"
             >
               {isCreating
-                ? "Creating..."
-                : `Create Group (${selectedUsers.size})`}
+                ? mode === "add-members"
+                  ? "Adding..."
+                  : "Creating..."
+                : mode === "add-members"
+                  ? `Add Members (${selectedUsers.size})`
+                  : `Create Group (${selectedUsers.size})`}
             </button>
           </div>
         )}

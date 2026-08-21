@@ -14,6 +14,8 @@ interface MessageInputProps {
   /** Pending offline messages waiting to be flushed */
   pendingMessages: Message[];
   onPendingUpdate: React.Dispatch<React.SetStateAction<Message[]>>;
+  replyTo?: Message["replyTo"];
+  onCancelReply?: () => void;
 }
 
 const TYPING_STOP_DELAY = 3000; // ms of inactivity before typing:stop
@@ -27,8 +29,10 @@ export default function MessageInput({
   onMessageSent,
   pendingMessages,
   onPendingUpdate,
+  replyTo,
+  onCancelReply = () => {},
 }: MessageInputProps) {
-  const [text, setText] = useState('');
+  const [text, setText] = useState("");
   const [isSending, setIsSending] = useState(false);
 
   // Refs for typing indicator state (don't need re-renders)
@@ -45,8 +49,11 @@ export default function MessageInput({
   const emitTypingStart = useCallback(() => {
     const now = Date.now();
     // Re-emit if more than TYPING_RESUME_DELAY has passed since last emit
-    if (!isTypingRef.current || now - lastTypingEmitRef.current > TYPING_RESUME_DELAY) {
-      socket.emit('typing:start', typingPayload());
+    if (
+      !isTypingRef.current ||
+      now - lastTypingEmitRef.current > TYPING_RESUME_DELAY
+    ) {
+      socket.emit("typing:start", typingPayload());
       isTypingRef.current = true;
       lastTypingEmitRef.current = now;
     }
@@ -54,7 +61,7 @@ export default function MessageInput({
 
   const emitTypingStop = useCallback(() => {
     if (isTypingRef.current) {
-      socket.emit('typing:stop', typingPayload());
+      socket.emit("typing:stop", typingPayload());
       isTypingRef.current = false;
     }
   }, [conversationId, currentUserId, currentUserName]);
@@ -94,16 +101,18 @@ export default function MessageInput({
       for (const pm of toFlush) {
         try {
           const sent = await api.sendMessage(token, pm.conversation, pm.text);
-          onMessageSent({ ...sent, status: 'sent' });
+          onMessageSent({ ...sent, status: "sent" });
         } catch {
           // Re-queue on failure
-          onPendingUpdate(prev => [...prev, pm]);
+          onPendingUpdate((prev) => [...prev, pm]);
         }
       }
     };
 
-    socket.on('connect', flushPending);
-    return () => { socket.off('connect', flushPending); };
+    socket.on("connect", flushPending);
+    return () => {
+      socket.off("connect", flushPending);
+    };
   }, [pendingMessages, token, conversationId]);
 
   const handleSend = async () => {
@@ -113,40 +122,46 @@ export default function MessageInput({
     // Stop typing indicator
     if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
     emitTypingStop();
-    setText('');
+    setText("");
+    const messageText = replyTo
+      ? `Replying to ${replyTo.senderName}: "${replyTo.text}"\n${trimmed}`
+      : trimmed;
+    onCancelReply();
 
     // PRIORITY 3: If offline or socket disconnected, queue the message
     if (!navigator.onLine || !socket.connected) {
       const pending: Message = {
-        _id: '',
+        _id: "",
         localId: `local_${Date.now()}`,
         conversation: conversationId,
         sender: currentUserId,
-        text: trimmed,
+        text: messageText,
         createdAt: new Date().toISOString(),
-        status: 'pending',
+        status: "pending",
+        replyTo,
       };
-      onPendingUpdate(prev => [...prev, pending]);
+      onPendingUpdate((prev) => [...prev, pending]);
       onMessageSent(pending); // Show optimistically in the list
       return;
     }
 
     setIsSending(true);
     try {
-      const sent = await api.sendMessage(token, conversationId, trimmed);
-      onMessageSent({ ...sent, status: 'sent' });
+      const sent = await api.sendMessage(token, conversationId, messageText);
+      onMessageSent({ ...sent, status: "sent", replyTo });
     } catch (err) {
       // On failure, queue it
       const pending: Message = {
-        _id: '',
+        _id: "",
         localId: `local_${Date.now()}`,
         conversation: conversationId,
         sender: currentUserId,
-        text: trimmed,
+        text: messageText,
         createdAt: new Date().toISOString(),
-        status: 'pending',
+        status: "pending",
+        replyTo,
       };
-      onPendingUpdate(prev => [...prev, pending]);
+      onPendingUpdate((prev) => [...prev, pending]);
       onMessageSent(pending);
     } finally {
       setIsSending(false);
@@ -154,7 +169,7 @@ export default function MessageInput({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
@@ -163,25 +178,58 @@ export default function MessageInput({
   const canSend = text.trim().length > 0 && !isSending;
 
   return (
-    <div className="p-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-end gap-2">
-      <textarea
-        value={text}
-        onChange={handleTextChange}
-        onKeyDown={handleKeyDown}
-        placeholder="Type a message…"
-        rows={1}
-        className="flex-1 resize-none px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-2xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm max-h-32 overflow-y-auto"
-      />
-      <button
-        onClick={handleSend}
-        disabled={!canSend}
-        className="flex-shrink-0 p-2.5 bg-blue-600 disabled:bg-blue-300 dark:disabled:bg-blue-800 text-white rounded-full transition-colors hover:bg-blue-700"
-        aria-label="Send message"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-        </svg>
-      </button>
+    <div className="border-t border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+      {replyTo && (
+        <div className="mb-2 flex items-center justify-between rounded-md border-l-2 border-blue-500 bg-gray-50 px-2 py-1.5 text-xs dark:bg-gray-700">
+          <div className="min-w-0">
+            <p className="font-semibold text-blue-600 dark:text-blue-300">
+              Replying to {replyTo.senderName}
+            </p>
+            <p className="truncate text-gray-600 dark:text-gray-300">
+              {replyTo.text}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onCancelReply}
+            className="ml-2 text-gray-500 hover:text-gray-800 dark:hover:text-white"
+            aria-label="Cancel reply"
+          >
+            X
+          </button>
+        </div>
+      )}
+      <div className="flex items-end gap-2">
+        <textarea
+          value={text}
+          onChange={handleTextChange}
+          onKeyDown={handleKeyDown}
+          placeholder="Type a message…"
+          rows={1}
+          className="flex-1 resize-none px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-2xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm max-h-32 overflow-y-auto"
+        />
+        <button
+          onClick={handleSend}
+          disabled={!canSend}
+          className="flex-shrink-0 p-2.5 bg-blue-600 disabled:bg-blue-300 dark:disabled:bg-blue-800 text-white rounded-full transition-colors hover:bg-blue-700"
+          aria-label="Send message"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-5 w-5 rotate-45"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+            />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }

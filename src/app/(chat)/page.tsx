@@ -8,13 +8,13 @@ import MessageBubble from '@/src/components/MessageBubble';
 import MessageInput from '@/src/components/MessageInput';
 import TypingIndicator from '@/src/components/TypingIndicator';
 import OfflineBanner from '@/src/components/OfflineBanner';
-import NewChatModal from "@/src/components/NewChatModal";
+import NewChatModal from '@/src/components/NewChatModal';
 import { api } from '@/src/lib/api';
 import { socket, connectSocket, disconnectSocket } from '@/src/lib/socket';
 import { Message, Conversation, SeenPayload, User } from "@/src/types";
 
 export default function ChatPage() {
-  const { token, user, logout } = useAuth();
+  const { token, user } = useAuth();
   const router = useRouter();
 
   // Persist selected conversation across reloads
@@ -44,7 +44,7 @@ export default function ChatPage() {
   const [selectedConversation, setSelectedConversation] =
     useState<Conversation | null>(null);
   const [showAddMembers, setShowAddMembers] = useState(false);
-  const [replyTo, setReplyTo] = useState<Message["replyTo"]>();
+  const [replyTo, setReplyTo] = useState<Message['replyTo']>();
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [errorMessages, setErrorMessages] = useState<string | null>(null);
 
@@ -105,27 +105,19 @@ export default function ChatPage() {
     try {
       const data = await api.getMessages(token, selectedConversationId);
       // Sort oldest to newest (ascending) so new messages appear at bottom
-      const sorted = [...data].sort(
-        (a, b) =>
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-      );
-
+      const sorted = [...data].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      
       // Priority 4: assume fetched messages are already 'seen' or 'delivered' by definition of being in DB
-      setMessages(sorted.map((m) => ({ ...m, status: "seen" })));
+      setMessages(sorted.map(m => ({ ...m, status: 'seen' })));
       // Wait for render then scroll
-      setTimeout(() => scrollToBottom("auto"), 100);
+      setTimeout(() => scrollToBottom('auto'), 100);
     } catch (err: any) {
-      console.error("Failed to load messages", err);
-      if (err?.status === 401 || err?.status === 403) {
-        logout();
-        router.replace("/login");
-        return;
-      }
-      setErrorMessages(err.message || "Failed to load messages");
+      console.error('Failed to load messages', err);
+      setErrorMessages(err.message || 'Failed to load messages');
     } finally {
       setLoadingMessages(false);
     }
-  }, [token, selectedConversationId, logout, router]);
+  }, [token, selectedConversationId]);
 
   // Fetch messages when conversation changes
   useEffect(() => {
@@ -254,7 +246,7 @@ export default function ChatPage() {
                 <h3 className="font-medium text-gray-900 dark:text-gray-100">
                   Chat
                 </h3>
-                {selectedConversation?.type === "group" && (
+                {selectedConversation?.type === 'group' && (
                   <button
                     type="button"
                     onClick={() => setShowAddMembers(true)}
@@ -262,12 +254,7 @@ export default function ChatPage() {
                     aria-label="Add members"
                     title="Add members"
                   >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                    >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Zm-9-2V7H4v3H1v2h3v3h2v-3h3v-2H6Zm9 4c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4Z" />
                     </svg>
                   </button>
@@ -321,9 +308,7 @@ export default function ChatPage() {
                           message={msg}
                           isOwn={msg.sender === user._id}
                           sender={sender}
-                          onReply={(message, senderName) =>
-                            setReplyTo({ senderName, text: message.text })
-                          }
+                          onReply={(message, senderName) => setReplyTo({ senderName, text: message.text })}
                         />
                       );
                     })}
@@ -393,35 +378,18 @@ export default function ChatPage() {
         <NewChatModal
           mode="add-members"
           conversationId={selectedConversation._id}
-          existingParticipantIds={
-            Array.isArray(selectedConversation.participants)
-              ? selectedConversation.participants.map((participant) =>
-                  typeof participant === "string"
-                    ? participant
-                    : participant._id,
-                )
-              : []
-          }
+          existingParticipantIds={Array.isArray(selectedConversation.participants)
+            ? selectedConversation.participants.map(participant => typeof participant === 'string' ? participant : participant._id)
+            : []}
           onClose={() => setShowAddMembers(false)}
           onChatCreated={() => undefined}
           onMembersAdded={(users) => {
-            setSelectedConversation((current) =>
-              current
-                ? {
-                    ...current,
-                    participants:
-                      Array.isArray(current.participants) &&
-                      current.participants.every(
-                        (participant) => typeof participant !== "string",
-                      )
-                        ? [...current.participants, ...users]
-                        : [
-                            ...(current.participants || []),
-                            ...users.map((user) => user._id),
-                          ],
-                  }
-                : current,
-            );
+            setSelectedConversation(current => current ? {
+              ...current,
+              participants: Array.isArray(current.participants) && current.participants.every(participant => typeof participant !== 'string')
+                ? [...current.participants, ...users]
+                : [...(current.participants || []), ...users.map(user => user._id)],
+            } : current);
           }}
         />
       )}

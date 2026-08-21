@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Message, MessageStatus, User } from "../types";
 
 interface MessageBubbleProps {
   message: Message;
   isOwn: boolean; // true if sent by the current user
   sender?: User;
+  onReply?: (message: Message, senderName: string) => void;
 }
 
 /** Priority 4: status icon shown only on own messages */
@@ -90,9 +91,51 @@ export default function MessageBubble({
   message,
   isOwn,
   sender,
+  onReply,
 }: MessageBubbleProps) {
   const isPending = message.status === "pending";
   const [showProfile, setShowProfile] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
+  const dragStartX = useRef<number | null>(null);
+  const parsedReply = message.text.match(
+    /^Replying to (.*?): "([\s\S]*)"\n([\s\S]*)$/,
+  );
+  const reply =
+    message.replyTo ||
+    (parsedReply
+      ? { senderName: parsedReply[1], text: parsedReply[2] }
+      : undefined);
+  const replyPrefix = message.replyTo
+    ? `Replying to ${message.replyTo.senderName}: "${message.replyTo.text}"\n`
+    : parsedReply
+      ? parsedReply[0].slice(0, parsedReply[0].length - parsedReply[3].length)
+      : "";
+  const displayedText = replyPrefix
+    ? message.text.slice(replyPrefix.length)
+    : message.text;
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    dragStartX.current = event.clientX;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (dragStartX.current === null) return;
+    const distance = event.clientX - dragStartX.current;
+    const direction = isOwn ? Math.min(0, distance) : Math.max(0, distance);
+    setDragOffset(Math.max(-72, Math.min(72, direction)));
+  };
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (
+      dragStartX.current !== null &&
+      Math.abs(event.clientX - dragStartX.current) > 56
+    ) {
+      onReply?.(message, sender?.name || (isOwn ? "You" : "User"));
+    }
+    dragStartX.current = null;
+    setDragOffset(0);
+  };
 
   return (
     <div
@@ -112,16 +155,36 @@ export default function MessageBubble({
         </div>
       )}
       <div
-        className={`min-w-0 max-w-[calc(100%-1.5rem)] rounded-xl px-2 py-1.5 text-xs shadow-sm md:max-w-[70%] md:rounded-2xl md:px-4 md:py-2.5 md:text-base
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={() => {
+          dragStartX.current = null;
+        }}
+        style={{ transform: `translateX(${dragOffset}px)` }}
+        className={`relative min-w-0 max-w-[calc(100%-1.5rem)] rounded-[1.1rem] px-3 py-2 text-xs shadow-[0_3px_12px_rgba(15,23,42,0.08)] transition-transform md:max-w-[70%] md:rounded-[1.35rem] md:px-4 md:py-2.5 md:text-base
           ${
             isOwn
-              ? `bg-blue-600 text-white rounded-br-none ${isPending ? "opacity-60" : ""}`
-              : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-bl-none"
+              ? `rounded-br-md bg-blue-600 text-white shadow-[0_4px_14px_rgba(37,99,235,0.2)] ${isPending ? "opacity-60" : ""}`
+              : "rounded-bl-md border border-gray-200/80 bg-white text-gray-900 shadow-[0_3px_12px_rgba(15,23,42,0.1)] dark:border-gray-600/70 dark:bg-gray-700/90 dark:text-gray-100 dark:shadow-[0_3px_12px_rgba(0,0,0,0.16)]"
           }`}
       >
-        <p className="wrap-break-word">{message.text}</p>
+        {dragOffset !== 0 && (
+          <span
+            className={`absolute top-1/2 -translate-y-1/2 text-blue-500 dark:text-blue-300 ${isOwn ? "-left-8" : "-right-8"}`}
+          >
+            {Math.abs(dragOffset) > 56 ? "↩" : "→"}
+          </span>
+        )}
+        {reply && (
+          <div className="mb-1.5 border-l-2 border-current/50 pl-2 text-[10px] opacity-75 md:text-xs">
+            <p className="font-semibold">{reply.senderName}</p>
+            <p className="truncate">{reply.text}</p>
+          </div>
+        )}
+        <p className="wrap-break-word">{displayedText}</p>
         <div
-          className={`flex items-center gap-1 mt-0.5 ${isOwn ? "justify-end" : "justify-start"}`}
+          className={`mt-1 flex items-center gap-1 ${isOwn ? "justify-end" : "justify-start"}`}
         >
           <span
             className={`text-[10px] md:text-xs ${isOwn ? "text-white/60" : "text-gray-500 dark:text-gray-400"}`}

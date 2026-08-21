@@ -2,7 +2,7 @@ export interface User {
   _id: string;
   name: string;
   phone: string;
-  createdAt: string;
+  createdAt?: string;
 }
 
 export interface Conversation {
@@ -29,8 +29,12 @@ export interface Message {
   text: string;
   createdAt: string;
   // Bonus features
-  status?: MessageStatus;     // for sent-by-me messages
-  localId?: string;           // temp id for pending (offline) messages
+  status?: MessageStatus; // for sent-by-me messages
+  localId?: string; // temp id for pending (offline) messages
+  replyTo?: {
+    senderName: string;
+    text: string;
+  };
 }
 
 export class ApiError extends Error {
