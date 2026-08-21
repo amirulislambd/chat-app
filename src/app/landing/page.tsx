@@ -1,7 +1,13 @@
-import Link from 'next/link';
-import ThemeToggle from '@/src/components/ThemeToggle';
+"use client";
+
+import Link from "next/link";
+import ThemeToggle from "@/src/components/ThemeToggle";
+import { useAuth } from "@/src/lib/auth-context";
 
 export default function LandingPage() {
+  const { user, token } = useAuth();
+  const appRoute = user && token ? "/chat" : "/login";
+
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans selection:bg-green-200 dark:selection:bg-green-900">
       {/* Navigation */}
@@ -30,7 +36,7 @@ export default function LandingPage() {
           <div className="flex items-center gap-4">
             <ThemeToggle />
             <Link
-              href="/"
+              href="/chat"
               className="hidden sm:inline-flex items-center justify-center px-5 py-2 text-sm font-medium rounded-full bg-green-500 text-white hover:bg-green-600 transition-colors"
             >
               Open Web App
@@ -55,13 +61,13 @@ export default function LandingPage() {
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
-              href="/login"
+              href={appRoute}
               className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-3.5 text-base font-semibold rounded-full bg-green-500 text-white hover:bg-green-600 shadow-lg shadow-green-500/30 transition-all hover:-translate-y-0.5"
             >
               Get Started for Free
             </Link>
             <Link
-              href="/"
+              href="/chat"
               className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-3.5 text-base font-semibold rounded-full bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
             >
               Open Web Version
