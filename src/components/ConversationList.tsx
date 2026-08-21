@@ -6,8 +6,9 @@ import { formatDistanceToNow } from 'date-fns';
 import NewChatModal from './NewChatModal';
 import ThemeToggle from './ThemeToggle';
 import { useAuth } from '../lib/auth-context';
-import { Conversation } from '../types';
+import { Conversation, Message } from '../types';
 import { api } from '../lib/api';
+import { socket } from '../lib/socket';
 
 interface ConversationListProps {
   selectedConversationId: string | null;
@@ -21,6 +22,8 @@ export default function ConversationList({ selectedConversationId, onSelectConve
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // unreadCounts: conversationId -> count
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
 
   const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false);
 
@@ -30,11 +33,11 @@ export default function ConversationList({ selectedConversationId, onSelectConve
     setError(null);
     try {
       const data = await api.getConversations(token);
-      
+
       if (!Array.isArray(data)) {
         throw new Error('Invalid response format from server');
       }
-      
+
       // Sort by most recently updated
       const sorted = [...data].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
       setConversations(sorted);
@@ -49,11 +52,65 @@ export default function ConversationList({ selectedConversationId, onSelectConve
     fetchConversations();
   }, [fetchConversations]);
 
+  // Real-time: listen for new messages and update sidebar instantly
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const handleNewMessage = (msg: Message) => {
+      const convId = msg.conversation;
+      if (!convId) return;
+
+      setConversations(prev => {
+        // Find the target conversation
+        const idx = prev.findIndex(c => c._id === convId);
+
+        let updated: Conversation;
+        if (idx !== -1) {
+          // Update lastMessage and updatedAt
+          updated = {
+            ...prev[idx],
+            lastMessage: { text: msg.text, createdAt: msg.createdAt },
+            updatedAt: msg.createdAt,
+          };
+          // Remove from old position, put at top
+          const rest = prev.filter((_, i) => i !== idx);
+          return [updated, ...rest];
+        }
+        // If conversation not in list (new), we can't fully reconstruct it yet
+        // Just refetch to be safe — this is a rare edge case
+        return prev;
+      });
+
+      // Increment unread count if this conversation is NOT the currently selected one
+      // and the message is not sent by me
+      if (convId !== selectedConversationId && msg.sender !== currentUser._id) {
+        setUnreadCounts(prev => ({
+          ...prev,
+          [convId]: (prev[convId] || 0) + 1,
+        }));
+      }
+    };
+
+    socket.on('message:new', handleNewMessage);
+    return () => {
+      socket.off('message:new', handleNewMessage);
+    };
+  }, [selectedConversationId, currentUser]);
+
+  // Clear unread count when user opens a conversation
+  const handleSelectConversation = (id: string) => {
+    setUnreadCounts(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    onSelectConversation(id);
+  };
+
   const getConversationName = (conv: Conversation) => {
     if (conv.type === 'group') {
       return conv.name || 'Unnamed Group';
     }
-    // For direct chats, the other participant is returned as conv.participant
     if (conv.participant) {
       return conv.participant.name || 'Unknown User';
     }
@@ -62,7 +119,6 @@ export default function ConversationList({ selectedConversationId, onSelectConve
 
   const handleChatCreated = (conv: Conversation) => {
     setIsNewChatModalOpen(false);
-    // Add to top of list if not already there
     setConversations(prev => {
       const exists = prev.find(c => c._id === conv._id);
       if (exists) return prev;
@@ -133,33 +189,57 @@ export default function ConversationList({ selectedConversationId, onSelectConve
           </div>
         ) : (
           // List state
-          <ul className="divide-y divide-gray-100 dark:divide-gray-700">
-            {conversations.map(conv => (
-              <li 
-                key={conv._id}
-                onClick={() => onSelectConversation(conv._id)}
-                className={`flex items-center p-3 cursor-pointer transition-colors border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700
-                  ${selectedConversationId === conv._id ? 'bg-blue-50 dark:bg-blue-900/30 border-l-4 border-l-blue-600 dark:border-l-blue-400' : 'border-l-4 border-l-transparent'}
-                `}
-              >
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 text-lg">
-                  {getConversationName(conv).charAt(0).toUpperCase()}
-                </div>
-                <div className="ml-3 flex-1 min-w-0">
-                  <div className="flex justify-between items-baseline mb-1">
-                    <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate">
-                      {getConversationName(conv)}
-                    </h3>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0 ml-2">
-                      {conv.lastMessage?.createdAt ? formatDistanceToNow(new Date(conv.lastMessage.createdAt), { addSuffix: true }) : ''}
-                    </span>
+          <ul>
+            {conversations.map(conv => {
+              const unread = unreadCounts[conv._id] || 0;
+              const isSelected = selectedConversationId === conv._id;
+              return (
+                <li
+                  key={conv._id}
+                  onClick={() => handleSelectConversation(conv._id)}
+                  className={`flex items-center p-3 cursor-pointer transition-colors border-l-4 hover:bg-gray-50 dark:hover:bg-gray-700
+                    ${isSelected
+                      ? 'bg-blue-50 dark:bg-blue-900/30 border-l-blue-600 dark:border-l-blue-400'
+                      : unread > 0
+                        ? 'border-l-green-500 bg-green-50/50 dark:bg-green-900/10'
+                        : 'border-l-transparent'
+                    }
+                  `}
+                >
+                  {/* Avatar */}
+                  <div className="relative flex-shrink-0">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                      {getConversationName(conv).charAt(0).toUpperCase()}
+                    </div>
+                    {/* Unread badge on avatar */}
+                    {unread > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-green-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow">
+                        {unread > 99 ? '99+' : unread}
+                      </span>
+                    )}
                   </div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                    {conv.lastMessage?.text || <span className="italic">No messages yet</span>}
-                  </p>
-                </div>
-              </li>
-            ))}
+
+                  {/* Info */}
+                  <div className="ml-3 flex-1 min-w-0">
+                    <div className="flex justify-between items-baseline mb-0.5">
+                      <h3 className={`font-semibold truncate ${unread > 0 ? 'text-gray-900 dark:text-gray-50' : 'text-gray-800 dark:text-gray-100'}`}>
+                        {getConversationName(conv)}
+                      </h3>
+                      <span className={`text-xs flex-shrink-0 ml-2 ${unread > 0 ? 'text-green-600 dark:text-green-400 font-medium' : 'text-gray-400 dark:text-gray-500'}`}>
+                        {conv.lastMessage?.createdAt
+                          ? formatDistanceToNow(new Date(conv.lastMessage.createdAt), { addSuffix: false })
+                          : ''}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-1">
+                      <p className={`text-sm truncate ${unread > 0 ? 'font-semibold text-gray-700 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400'}`}>
+                        {conv.lastMessage?.text || <span className="italic font-normal text-gray-400 dark:text-gray-500">No messages yet</span>}
+                      </p>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
