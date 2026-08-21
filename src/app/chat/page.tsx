@@ -119,6 +119,9 @@ export default function ChatPage() {
     } catch (err: any) {
       console.error("Failed to load messages", err);
       if (err?.status === 401 || err?.status === 403) {
+        setSelectedConversationId(null);
+        setSelectedConversation(null);
+        localStorage.removeItem("selectedConversationId");
         logout();
         router.replace("/login");
         return;

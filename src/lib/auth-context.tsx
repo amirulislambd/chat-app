@@ -34,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = (newUser: User, newToken: string) => {
     setUser(newUser);
     setToken(newToken);
+    localStorage.removeItem("selectedConversationId");
     localStorage.setItem('token', newToken);
     localStorage.setItem('user', JSON.stringify(newUser));
   };
@@ -41,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setUser(null);
     setToken(null);
+    localStorage.removeItem("selectedConversationId");
     localStorage.removeItem('token');
     localStorage.removeItem('user');
   };
