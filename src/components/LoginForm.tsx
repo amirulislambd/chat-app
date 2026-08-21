@@ -52,20 +52,20 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="w-full max-w-md bg-white rounded-xl shadow-md p-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+    <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl shadow-md dark:shadow-gray-900 p-8">
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 text-center">
         Welcome to ChatApp
       </h1>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 text-red-700 text-sm rounded-md">
+        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-sm rounded-md">
           {error}
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Phone Number
           </label>
           <input
@@ -74,13 +74,13 @@ export default function LoginForm() {
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="+15551234567"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             disabled={loading}
           />
         </div>
 
         <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Your Name
           </label>
           <input
@@ -89,7 +89,7 @@ export default function LoginForm() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Ada Lovelace"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             disabled={loading}
           />
         </div>
@@ -99,8 +99,8 @@ export default function LoginForm() {
           disabled={!isFormValid || loading}
           className={`w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white 
             ${!isFormValid || loading
-              ? 'bg-blue-300 cursor-not-allowed'
-              : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
+              ? 'bg-blue-300 dark:bg-blue-800 cursor-not-allowed'
+              : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800'
             } transition-colors`}
         >
           {loading ? (

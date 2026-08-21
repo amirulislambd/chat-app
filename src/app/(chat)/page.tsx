@@ -30,7 +30,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
       {/* Sidebar: Conversation List */}
       <ConversationList
         selectedConversationId={selectedConversationId}
@@ -38,13 +38,13 @@ export default function ChatPage() {
       />
 
       {/* Main Content: Chat Panel Placeholder */}
-      <main className="flex-1 flex flex-col min-w-0 bg-white">
+      <main className="flex-1 flex flex-col min-w-0 bg-white dark:bg-gray-800">
         {selectedConversationId ? (
-          <div className="flex-1 flex items-center justify-center text-gray-500">
+          <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
             Chat Panel Placeholder (Conversation ID: {selectedConversationId})
           </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-500">
+          <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
             Select a conversation to start chatting
           </div>
         )}
