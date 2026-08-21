@@ -1,8 +1,21 @@
 export interface User {
-  id: string;
+  _id: string;
   name: string;
-  email: string;
-  avatar?: string;
+  phone: string;
+  createdAt: string;
+}
+
+export interface Conversation {
+  id: string;
+  type: 'direct' | 'group';
+  participants: User[];
+  name?: string;
+  admins?: string[];
+  lastMessage?: {
+    text: string;
+    createdAt: string;
+  };
+  updatedAt: string;
 }
 
 export interface Message {
@@ -13,9 +26,14 @@ export interface Message {
   createdAt: string;
 }
 
-export interface Conversation {
-  id: string;
-  participants: User[];
-  lastMessage?: Message;
-  updatedAt: string;
+export class ApiError extends Error {
+  status: number;
+  data?: any;
+
+  constructor(status: number, message: string, data?: any) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.data = data;
+  }
 }
