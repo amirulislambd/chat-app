@@ -56,8 +56,11 @@ export default function ChatPage() {
     setErrorMessages(null);
     try {
       const data = await api.getMessages(token, selectedConversationId);
+      // Sort oldest to newest (ascending) so new messages appear at bottom
+      const sorted = [...data].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      
       // Priority 4: assume fetched messages are already 'seen' or 'delivered' by definition of being in DB
-      setMessages(data.map(m => ({ ...m, status: 'seen' })));
+      setMessages(sorted.map(m => ({ ...m, status: 'seen' })));
       // Wait for render then scroll
       setTimeout(() => scrollToBottom('auto'), 100);
     } catch (err: any) {
@@ -112,14 +115,21 @@ export default function ChatPage() {
       }
     };
 
+    const handleReconnect = () => {
+      // Re-fetch messages if the socket drops and reconnects, to avoid missing any messages
+      fetchMsgs();
+    };
+
     socket.on('message:new', handleNewMessage);
     socket.on('message:seen', handleMessageSeen);
+    socket.on('connect', handleReconnect);
 
     return () => {
       socket.off('message:new', handleNewMessage);
       socket.off('message:seen', handleMessageSeen);
+      socket.off('connect', handleReconnect);
     };
-  }, [selectedConversationId, user]);
+  }, [selectedConversationId, user, fetchMsgs]);
 
   if (!user || !token) {
     return <div className="h-screen bg-white dark:bg-gray-900" />;
@@ -132,18 +142,27 @@ export default function ChatPage() {
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
       <OfflineBanner />
       
-      {/* Sidebar: Conversation List */}
+      {/* Sidebar: ConversationList */}
       <ConversationList
         selectedConversationId={selectedConversationId}
         onSelectConversation={setSelectedConversationId}
+        className={selectedConversationId ? 'hidden md:flex' : 'flex'}
       />
 
       {/* Main Content: Chat Panel */}
-      <main className="flex-1 flex flex-col min-w-0 bg-white dark:bg-gray-800 relative">
+      <main className={`flex-1 flex-col min-w-0 bg-white dark:bg-gray-800 relative ${!selectedConversationId ? 'hidden md:flex' : 'flex'}`}>
         {selectedConversationId ? (
           <>
-            {/* Header placeholder (would normally show conversation name) */}
-            <div className="h-14 border-b border-gray-200 dark:border-gray-700 flex items-center px-4 bg-white dark:bg-gray-800 shadow-sm z-10 flex-shrink-0">
+            {/* Header */}
+            <div className="h-14 border-b border-gray-200 dark:border-gray-700 flex items-center px-4 bg-white dark:bg-gray-800 shadow-sm z-10 flex-shrink-0 gap-3">
+               <button 
+                 onClick={() => setSelectedConversationId(null)}
+                 className="md:hidden p-2 -ml-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+               >
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                   <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                 </svg>
+               </button>
                <h3 className="font-medium text-gray-900 dark:text-gray-100">Chat</h3>
             </div>
 

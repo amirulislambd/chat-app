@@ -12,9 +12,10 @@ import { api } from '../lib/api';
 interface ConversationListProps {
   selectedConversationId: string | null;
   onSelectConversation: (id: string) => void;
+  className?: string;
 }
 
-export default function ConversationList({ selectedConversationId, onSelectConversation }: ConversationListProps) {
+export default function ConversationList({ selectedConversationId, onSelectConversation, className = '' }: ConversationListProps) {
   const { token, user: currentUser } = useAuth();
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -71,7 +72,7 @@ export default function ConversationList({ selectedConversationId, onSelectConve
   };
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 w-full md:w-80 flex-shrink-0">
+    <div className={`flex flex-col h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 w-full md:w-80 flex-shrink-0 ${className}`}>
       <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
         <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Chats</h2>
         <div className="flex items-center space-x-2">
