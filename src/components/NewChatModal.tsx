@@ -11,9 +11,11 @@ type Tab = 'direct' | 'group';
 interface NewChatModalProps {
   onClose: () => void;
   onChatCreated: (conversation: Conversation) => void;
+  /** Pass the current conversation list so we can detect duplicates client-side (Priority 1) */
+  existingConversations?: Conversation[];
 }
 
-export default function NewChatModal({ onClose, onChatCreated }: NewChatModalProps) {
+export default function NewChatModal({ onClose, onChatCreated, existingConversations = [] }: NewChatModalProps) {
   const { token, user: currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('direct');
 
@@ -81,6 +83,20 @@ export default function NewChatModal({ onClose, onChatCreated }: NewChatModalPro
 
   const handleStartDirectChat = async (userId: string) => {
     if (!token) return;
+
+    // PRIORITY 1: Check if a direct conversation with this user already exists locally.
+    // If so, navigate straight to it — don't call the API again.
+    const existing = existingConversations.find(
+      c =>
+        c.type === 'direct' &&
+        Array.isArray(c.participants) &&
+        c.participants.some(p => p._id === userId)
+    );
+    if (existing) {
+      onChatCreated(existing); // jump straight to the existing conversation
+      return;
+    }
+
     setIsCreating(true);
     setError(null);
     try {

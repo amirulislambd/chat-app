@@ -173,6 +173,7 @@ export default function ConversationList({ selectedConversationId, onSelectConve
         <NewChatModal
           onClose={() => setIsNewChatModalOpen(false)}
           onChatCreated={handleChatCreated}
+          existingConversations={conversations}
         />
       )}
     </div>

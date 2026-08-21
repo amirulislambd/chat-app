@@ -18,12 +18,18 @@ export interface Conversation {
   updatedAt: string;
 }
 
+/** Status progression for my own sent messages */
+export type MessageStatus = 'pending' | 'sent' | 'delivered' | 'seen';
+
 export interface Message {
   id: string;
   conversationId: string;
   senderId: string;
   text: string;
   createdAt: string;
+  // Bonus features
+  status?: MessageStatus;     // for sent-by-me messages
+  localId?: string;           // temp id for pending (offline) messages
 }
 
 export class ApiError extends Error {
@@ -36,4 +42,18 @@ export class ApiError extends Error {
     this.status = status;
     this.data = data;
   }
+}
+
+/** Typing indicator payload used over socket */
+export interface TypingPayload {
+  conversationId: string;
+  userId: string;
+  userName: string;
+}
+
+/** socket: message:seen payload */
+export interface SeenPayload {
+  conversationId: string;
+  lastSeenMessageId: string;
+  userId: string;
 }
