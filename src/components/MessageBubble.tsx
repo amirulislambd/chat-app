@@ -63,6 +63,41 @@ function initials(name?: string) {
   return name?.trim().charAt(0).toUpperCase() || "?";
 }
 
+function LinkifiedText({ text, isOwn }: { text: string; isOwn: boolean }) {
+  const urlPattern = /(https?:\/\/[^\s<]+|www\.[^\s<]+)/gi;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = urlPattern.exec(text)) !== null) {
+    const rawUrl = match[0];
+    const trailingPunctuation = rawUrl.match(/[),.!?;:]+$/)?.[0] || "";
+    const url = trailingPunctuation
+      ? rawUrl.slice(0, -trailingPunctuation.length)
+      : rawUrl;
+
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    parts.push(
+      <a
+        key={`${match.index}-${url}`}
+        href={url.startsWith("www.") ? `https://${url}` : url}
+        target="_blank"
+        rel="noreferrer noopener"
+        className={`break-all underline decoration-1 underline-offset-2 transition-opacity hover:opacity-75 ${isOwn ? "text-white" : "text-blue-600 dark:text-blue-300"}`}
+      >
+        {url}
+      </a>,
+    );
+    if (trailingPunctuation) parts.push(trailingPunctuation);
+    lastIndex = match.index + rawUrl.length;
+  }
+
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return <>{parts}</>;
+}
+
 function ProfilePopover({ user, isOwn }: { user?: User; isOwn: boolean }) {
   if (!user) return null;
 
@@ -182,7 +217,9 @@ export default function MessageBubble({
             <p className="truncate">{reply.text}</p>
           </div>
         )}
-        <p className="wrap-break-word">{displayedText}</p>
+        <p className="wrap-break-word">
+          <LinkifiedText text={displayedText} isOwn={isOwn} />
+        </p>
         <div
           className={`mt-1 flex items-center gap-1 ${isOwn ? "justify-end" : "justify-start"}`}
         >
