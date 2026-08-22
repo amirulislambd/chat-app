@@ -6,46 +6,6 @@ import { ApiError } from '../types';
 import { useAuth } from '../lib/auth-context';
 import { api } from '../lib/api';
 
-function normalizeName(value: string) {
-  return value.trim().replace(/\s+/g, " ").toLowerCase();
-}
-
-function normalizePhone(value: string) {
-  return value.replace(/\D/g, "");
-}
-
-async function validateUniqueIdentity(
-  token: string,
-  requestedName: string,
-  requestedPhone: string,
-  user: { name: string; phone: string },
-) {
-  const normalizedName = normalizeName(requestedName);
-  const normalizedPhone = normalizePhone(requestedPhone);
-
-  if (
-    normalizedName !== normalizeName(user.name) ||
-    normalizedPhone !== normalizePhone(user.phone)
-  ) {
-    throw new Error(
-      "This phone number already belongs to another name. Use the existing name or a different number.",
-    );
-  }
-
-  const sameNameUsers = await api.searchUsers(token, requestedName);
-  const duplicateName = sameNameUsers.some(
-    (candidate) =>
-      normalizeName(candidate.name) === normalizedName &&
-      normalizePhone(candidate.phone) !== normalizedPhone,
-  );
-
-  if (duplicateName) {
-    throw new Error(
-      "This name is already in use with another phone number. Please use a unique name.",
-    );
-  }
-}
-
 
 export default function LoginForm() {
   const [phone, setPhone] = useState('');
@@ -77,12 +37,6 @@ export default function LoginForm() {
 
     try {
       const response = await api.login(phone.trim(), name.trim());
-      await validateUniqueIdentity(
-        response.token,
-        name.trim(),
-        phone.trim(),
-        response.user,
-      );
       // On success, store the JWT token and user object
       login(response.user, response.token);
       router.push("/chat");
