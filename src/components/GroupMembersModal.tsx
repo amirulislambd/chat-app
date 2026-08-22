@@ -6,6 +6,7 @@ import { User } from "../types";
 interface GroupMembersModalProps {
   groupName: string;
   members: Array<User | string>;
+  admins?: string[];
   onClose: () => void;
 }
 
@@ -18,18 +19,33 @@ function memberDetail(member: User | string) {
 }
 
 function memberInitial(member: User | string) {
-  return (typeof member === "string" ? member : member.name)
-    .trim()
-    .charAt(0)
-    .toUpperCase() || "?";
+  return (
+    (typeof member === "string" ? member : member.name)
+      .trim()
+      .charAt(0)
+      .toUpperCase() || "?"
+  );
+}
+
+function memberId(member: User | string) {
+  return typeof member === "string" ? member : member._id;
 }
 
 export default function GroupMembersModal({
   groupName,
   members,
+  admins = [],
   onClose,
 }: GroupMembersModalProps) {
   if (typeof document === "undefined") return null;
+
+  const sortedMembers = members
+    .map((member, index) => ({ member, index }))
+    .sort((a, b) => {
+      const aIsAdmin = admins.includes(memberId(a.member));
+      const bIsAdmin = admins.includes(memberId(b.member));
+      return Number(bIsAdmin) - Number(aIsAdmin) || a.index - b.index;
+    });
 
   return createPortal(
     <div
@@ -72,24 +88,36 @@ export default function GroupMembersModal({
             {members.length} {members.length === 1 ? "member" : "members"}
           </p>
           <ul className="space-y-1">
-            {members.map((member, index) => (
-              <li
-                key={typeof member === "string" ? member : member._id || index}
-                className="flex items-center gap-3 rounded-xl px-2 py-2.5"
-              >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 text-sm font-bold text-white">
-                  {memberInitial(member)}
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-gray-900 dark:text-white">
-                    {memberLabel(member)}
+            {sortedMembers.map(({ member, index }) => {
+              const isAdmin = admins.includes(memberId(member));
+              return (
+                <li
+                  key={
+                    typeof member === "string" ? member : member._id || index
+                  }
+                  className="flex items-center gap-3 rounded-xl px-2 py-2.5"
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 text-sm font-bold text-white">
+                    {memberInitial(member)}
                   </span>
-                  <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
-                    {memberDetail(member)}
+                  <span className="min-w-0">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                        {memberLabel(member)}
+                      </span>
+                      {isAdmin && (
+                        <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
+                          Admin
+                        </span>
+                      )}
+                    </span>
+                    <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
+                      {memberDetail(member)}
+                    </span>
                   </span>
-                </span>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         </div>
       </section>

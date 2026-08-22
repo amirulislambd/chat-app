@@ -466,6 +466,7 @@ export default function ChatPage() {
         <GroupMembersModal
           groupName={selectedConversation.name || "Unnamed Group"}
           members={groupMembers}
+          admins={selectedConversation.admins}
           onClose={() => setShowMembers(false)}
         />
       )}

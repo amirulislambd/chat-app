@@ -74,8 +74,15 @@ export default function NewChatModal({
         const results = await api.searchUsers(token, debouncedQuery);
         // Exclude current user from results
         if (isMounted) {
+          const seenIdentities = new Set<string>();
+          const uniqueResults = results.filter((candidate) => {
+            const identity = `${candidate.name.trim().replace(/\s+/g, " ").toLowerCase()}|${candidate.phone.replace(/\D/g, "")}`;
+            if (seenIdentities.has(identity)) return false;
+            seenIdentities.add(identity);
+            return true;
+          });
           setSearchResults(
-            results.filter(
+            uniqueResults.filter(
               (u) =>
                 u._id !== currentUser?._id &&
                 !participantIdsKey.split(",").includes(u._id),
