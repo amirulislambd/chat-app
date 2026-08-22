@@ -85,6 +85,9 @@ function LinkifiedText({ text, isOwn }: { text: string; isOwn: boolean }) {
         href={url.startsWith("www.") ? `https://${url}` : url}
         target="_blank"
         rel="noreferrer noopener"
+        onPointerDown={(event) => event.stopPropagation()}
+        onPointerUp={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
         className={`break-all underline decoration-1 underline-offset-2 transition-opacity hover:opacity-75 ${isOwn ? "text-white" : "text-blue-600 dark:text-blue-300"}`}
       >
         {url}
